@@ -1,5 +1,4 @@
-// UPDATE THIS after deploying to Vercel
-const API_URL = "https://your-project.vercel.app/api/summarize";
+const API_URL = "https://fb-group-watcher.vercel.app/api/summarize";
 
 let extractedData = null;
 
