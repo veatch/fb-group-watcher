@@ -1,0 +1,96 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  width: 300px;
+  padding: 16px;
+  background: #f0f2f5;
+}
+
+.container {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+  font-size: 18px;
+  color: #1877f2;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e4e6eb;
+}
+
+.group-name {
+  font-weight: 600;
+  color: #050505;
+  margin-bottom: 4px;
+}
+
+.post-count {
+  font-size: 13px;
+  color: #65676b;
+  margin-bottom: 16px;
+}
+
+.btn {
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn.primary {
+  background: #1877f2;
+  color: white;
+}
+
+.btn.primary:hover {
+  background: #166fe5;
+}
+
+.btn.primary:disabled {
+  background: #bcc0c4;
+  cursor: not-allowed;
+}
+
+.status {
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.status.loading {
+  background: #e7f3ff;
+  color: #1877f2;
+}
+
+.status.success {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status.error {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.message {
+  text-align: center;
+  color: #65676b;
+  padding: 20px 0;
+}
+
+.hidden {
+  display: none;
+}

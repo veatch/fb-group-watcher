@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>FB Group Watcher</h1>
+
+      <div id="not-group" class="message hidden">
+        <p>Please navigate to a Facebook group page to use this extension.</p>
+      </div>
+
+      <div id="main-content">
+        <p id="group-name" class="group-name"></p>
+        <p class="post-count">Found <span id="post-count">0</span> posts</p>
+
+        <button id="summarize-btn" class="btn primary">
+          Summarize & Email
+        </button>
+
+        <div id="status" class="status hidden"></div>
+      </div>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>

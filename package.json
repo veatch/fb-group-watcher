@@ -1,0 +1,14 @@
+{
+  "name": "fb-group-watcher",
+  "version": "1.0.0",
+  "description": "Summarize Facebook group posts and send email digests",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "openai": "^4.77.0",
+    "resend": "^4.0.0"
+  }
+}
