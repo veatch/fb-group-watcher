@@ -34,6 +34,23 @@ async function init() {
   }
 }
 
+async function scrollAndExtractPosts() {
+  // Scroll three times to load more posts
+  for (let i = 0; i < 3; i++) {
+    // Scroll to bottom of page
+    window.scrollTo(0, document.body.scrollHeight);
+    
+    // Wait for content to load (Facebook uses lazy loading)
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+  
+  // Wait a bit more after final scroll to ensure all content is loaded
+  await new Promise(resolve => setTimeout(resolve, 1000));
+  
+  // Now extract posts
+  return extractPosts();
+}
+
 function extractPosts() {
   // Get group name from the page
   const groupNameEl =
@@ -99,9 +116,52 @@ async function handleSummarize() {
   const btn = document.getElementById("summarize-btn");
   btn.disabled = true;
 
-  setStatus("Extracting and summarizing posts...", "loading");
+  // Check if we have initial data, if not try to get it first
+  if (!extractedData) {
+    setStatus("Extracting initial posts...", "loading");
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: extractPosts,
+      });
+      extractedData = results[0].result;
+    } catch (error) {
+      setStatus("Error: " + error.message, "error");
+      btn.disabled = false;
+      return;
+    }
+  }
+
+  setStatus("Scrolling to load more posts...", "loading");
 
   try {
+    // Get the current tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    // Scroll three times and extract posts
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: scrollAndExtractPosts,
+    });
+
+    extractedData = results[0].result;
+
+    // Check if extraction was successful
+    if (!extractedData || !extractedData.posts) {
+      throw new Error("Failed to extract posts. Please try again.");
+    }
+
+    // Update post count display
+    document.getElementById("post-count").textContent =
+      extractedData.posts.length;
+
+    if (extractedData.posts.length === 0) {
+      throw new Error("No posts found after scrolling. Please try again.");
+    }
+
+    setStatus("Extracting and summarizing posts...", "loading");
+
     // Format posts for the API
     const postsText = extractedData.posts
       .map(
