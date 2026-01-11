@@ -1,3 +1,5 @@
+import { API_SECRET } from "./config.js";
+
 const API_URL = "https://fb-group-watcher.vercel.app/api/summarize";
 
 async function init() {
@@ -104,7 +106,10 @@ async function handleSummarize() {
 
     const response = await fetch(API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Secret": API_SECRET,
+      },
       body: JSON.stringify({
         screenshots,
         groupName,
@@ -153,7 +158,12 @@ async function handleDebug() {
     console.log("Total payload size:", Math.round(JSON.stringify({ screenshots, groupName }).length / 1024) + " KB");
     console.log("=== END DEBUG ===");
 
-    setStatus(`Captured ${screenshots.length} screenshots (check console F12)`, "success");
+    // Open each screenshot in a new tab
+    for (const screenshot of screenshots) {
+      await chrome.tabs.create({ url: screenshot, active: false });
+    }
+
+    setStatus(`Captured ${screenshots.length} screenshots (opened in new tabs)`, "success");
   } catch (error) {
     setStatus("Error: " + error.message, "error");
     console.error("Debug error:", error);

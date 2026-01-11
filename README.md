@@ -43,12 +43,21 @@ Set these in the Vercel dashboard:
 | `ANTHROPIC_API_KEY` | Claude API key (required) |
 | `RESEND_API_KEY` | Resend API key (required) |
 | `RECIPIENT_EMAIL` | Your email address (required) |
+| `API_SECRET` | Shared secret for API auth (required) |
 | `LLM_PROVIDER` | `claude` (default) or `openai` for summarization |
 | `OPENAI_API_KEY` | OpenAI API key (only if using `openai` provider) |
 
-### 4. Update extension config
+### 4. Configure extension
 
-Edit `extension/popup.js` and set `API_URL` to your Vercel deployment URL.
+1. Edit `extension/popup.js` and set `API_URL` to your Vercel deployment URL
+2. Copy `extension/config.example.js` to `extension/config.js`
+3. Set `API_SECRET` in `config.js` to the same value you used in Vercel. You can generate a secret by running `openssl rand -hex 16` for example
+
+```bash
+cp extension/config.example.js extension/config.js
+```
+
+Note: `config.js` is gitignored and won't be committed.
 
 ### 5. Add extension icons (optional)
 
