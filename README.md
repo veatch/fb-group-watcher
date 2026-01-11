@@ -2,15 +2,23 @@
 
 A Chrome extension that summarizes Facebook group posts and sends you an email digest.
 
+## How it works
+
+The extension uses a visual approach to extract posts from Facebook groups. Instead of parsing Facebook's DOM, it captures screenshots of the page and uses Claude's vision capabilities to identify and extract post content.
+
 ## Architecture
 
 ```
 ┌─────────────────────┐         ┌─────────────────────┐
 │  Chrome Extension   │  HTTP   │   Vercel Function   │
-│  - Extract posts    │────────▶│   - Summarize (LLM) │
-│  - Send to backend  │         │   - Send email      │
-└─────────────────────┘         └─────────────────────┘
+│  - Capture          │────────▶│   - Extract posts   │
+│    screenshots      │         │     (Claude Vision) │
+│  - Send to backend  │         │   - Summarize (LLM) │
+└─────────────────────┘         │   - Send email      │
+                                └─────────────────────┘
 ```
+
+The extension captures 3 screenshots while scrolling through the group feed, then sends them to the backend where Claude Vision extracts the posts and summarizes them.
 
 ## Setup
 
@@ -32,17 +40,17 @@ Set these in the Vercel dashboard:
 
 | Variable | Description |
 |----------|-------------|
-| `LLM_PROVIDER` | `claude` or `openai` |
-| `ANTHROPIC_API_KEY` | Claude API key |
-| `OPENAI_API_KEY` | OpenAI API key |
-| `RESEND_API_KEY` | Resend API key |
-| `RECIPIENT_EMAIL` | Your email address |
+| `ANTHROPIC_API_KEY` | Claude API key (required) |
+| `RESEND_API_KEY` | Resend API key (required) |
+| `RECIPIENT_EMAIL` | Your email address (required) |
+| `LLM_PROVIDER` | `claude` (default) or `openai` for summarization |
+| `OPENAI_API_KEY` | OpenAI API key (only if using `openai` provider) |
 
 ### 4. Update extension config
 
 Edit `extension/popup.js` and set `API_URL` to your Vercel deployment URL.
 
-### 5. Add extension icons
+### 5. Add extension icons (optional)
 
 Add these files to `extension/`:
 - `icon16.png` (16x16)
@@ -59,11 +67,12 @@ Add these files to `extension/`:
 ## Usage
 
 1. Navigate to a Facebook group
-2. Scroll to load posts you want summarized
-3. Click the extension icon
-4. Click "Summarize & Email"
-5. Check your inbox
+2. Click the extension icon
+3. Click "Summarize & Email" (the extension will scroll and capture screenshots automatically)
+4. Check your inbox (or your spam folder if you don't see the email)
 
-## Switching LLM providers
+## LLM providers
 
-Change `LLM_PROVIDER` in Vercel to switch between `claude` and `openai`.
+The default provider is Claude (`claude`), which is required for the vision-based post extraction.
+
+Initially OpenAI (`openai`) support was planned, but was not built after Facebook DOM parsing proved problematic.
