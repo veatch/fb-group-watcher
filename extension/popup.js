@@ -1,7 +1,5 @@
 const API_URL = "https://fb-group-watcher.vercel.app/api/summarize";
 
-let extractedData = null;
-
 async function init() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
@@ -11,81 +9,24 @@ async function init() {
     return;
   }
 
-  // Inject content script and extract posts
+  // Get group name from the page
   try {
     const results = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      func: extractPosts,
+      func: () => {
+        const groupNameEl =
+          document.querySelector('h1 a[href*="/groups/"]') ||
+          document.querySelector('a[aria-label][href*="/groups/"]');
+        return groupNameEl?.textContent || "Facebook Group";
+      },
     });
 
-    extractedData = results[0].result;
-
-    document.getElementById("group-name").textContent = extractedData.groupName;
-    document.getElementById("post-count").textContent =
-      extractedData.posts.length;
-
-    if (extractedData.posts.length === 0) {
-      setStatus("No posts found. Try scrolling down to load more.", "error");
-      document.getElementById("summarize-btn").disabled = true;
-    }
+    document.getElementById("group-name").textContent = results[0].result;
+    document.getElementById("post-count").textContent = "—";
   } catch (error) {
-    setStatus("Failed to extract posts: " + error.message, "error");
+    setStatus("Failed to get group info: " + error.message, "error");
     document.getElementById("summarize-btn").disabled = true;
   }
-}
-
-function extractPosts() {
-  // Get group name from the page
-  const groupNameEl =
-    document.querySelector('h1 a[href*="/groups/"]') ||
-    document.querySelector('a[aria-label][href*="/groups/"]');
-  const groupName = groupNameEl?.textContent || "Facebook Group";
-
-  // Find post containers - Facebook uses various class patterns
-  const postContainers = document.querySelectorAll('[role="article"]');
-
-  const posts = [];
-
-  postContainers.forEach((container, index) => {
-    // Skip if this doesn't look like a group post
-    if (!container.closest('[data-pagelet*="GroupFeed"]') &&
-        !container.closest('[role="feed"]')) {
-      return;
-    }
-
-    // Extract author
-    const authorEl = container.querySelector(
-      'a[role="link"] strong, h4 a, [data-ad-preview="message"] a'
-    );
-    const author = authorEl?.textContent || "Unknown";
-
-    // Extract post text
-    const textEl = container.querySelector(
-      '[data-ad-preview="message"], [data-ad-comet-preview="message"], div[dir="auto"]'
-    );
-    const text = textEl?.textContent || "";
-
-    // Extract timestamp
-    const timeEl = container.querySelector("abbr, a[href*='permalink'] span");
-    const timestamp = timeEl?.textContent || "";
-
-    // Extract engagement metrics if visible
-    const likesEl = container.querySelector('[aria-label*="reaction"]');
-    const commentsEl = container.querySelector('[aria-label*="comment"]');
-
-    if (text.trim()) {
-      posts.push({
-        index: index + 1,
-        author,
-        text: text.slice(0, 1000), // Limit text length
-        timestamp,
-        likes: likesEl?.textContent || "0",
-        comments: commentsEl?.textContent || "0",
-      });
-    }
-  });
-
-  return { groupName, posts };
 }
 
 function setStatus(message, type) {
@@ -95,27 +36,78 @@ function setStatus(message, type) {
   statusEl.classList.remove("hidden");
 }
 
+async function captureScreenshots() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const screenshots = [];
+
+  // Get viewport height for scrolling
+  const [{ result: viewportHeight }] = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: () => window.innerHeight,
+  });
+
+  // Capture initial screenshot (JPEG at 70% quality to reduce size)
+  setStatus("Capturing screenshots (1/3)...", "loading");
+  let screenshot = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "jpeg", quality: 70 });
+  screenshots.push(screenshot);
+
+  // Scroll and capture more screenshots (reduced to 3 total)
+  for (let i = 1; i < 3; i++) {
+    setStatus(`Capturing screenshots (${i + 1}/3)...`, "loading");
+
+    // Scroll down
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: (scrollAmount) => {
+        window.scrollBy(0, scrollAmount);
+      },
+      args: [viewportHeight * 0.8], // Scroll 80% of viewport to ensure overlap
+    });
+
+    // Wait for content to load
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
+    // Capture screenshot
+    screenshot = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "jpeg", quality: 70 });
+    screenshots.push(screenshot);
+  }
+
+  // Scroll back to top
+  await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: () => window.scrollTo(0, 0),
+  });
+
+  return screenshots;
+}
+
 async function handleSummarize() {
   const btn = document.getElementById("summarize-btn");
   btn.disabled = true;
 
-  setStatus("Extracting and summarizing posts...", "loading");
-
   try {
-    // Format posts for the API
-    const postsText = extractedData.posts
-      .map(
-        (p) =>
-          `[Post ${p.index}] ${p.author} (${p.timestamp}):\n${p.text}\nReactions: ${p.likes}, Comments: ${p.comments}`
-      )
-      .join("\n\n---\n\n");
+    const screenshots = await captureScreenshots();
+
+    // Get group name
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const [{ result: groupName }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => {
+        const groupNameEl =
+          document.querySelector('h1 a[href*="/groups/"]') ||
+          document.querySelector('a[aria-label][href*="/groups/"]');
+        return groupNameEl?.textContent || "Facebook Group";
+      },
+    });
+
+    setStatus("Sending to server for processing...", "loading");
 
     const response = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        posts: postsText,
-        groupName: extractedData.groupName,
+        screenshots,
+        groupName,
       }),
     });
 
@@ -125,7 +117,8 @@ async function handleSummarize() {
       throw new Error(data.error || "Failed to summarize");
     }
 
-    setStatus(`Summary sent to your email! (via ${data.provider})`, "success");
+    document.getElementById("post-count").textContent = data.postCount || "—";
+    setStatus(`Summary sent to your email! (${data.postCount} posts found)`, "success");
   } catch (error) {
     setStatus("Error: " + error.message, "error");
   } finally {
@@ -133,5 +126,42 @@ async function handleSummarize() {
   }
 }
 
+async function handleDebug() {
+  const btn = document.getElementById("debug-btn");
+  btn.disabled = true;
+
+  try {
+    const screenshots = await captureScreenshots();
+
+    // Get group name
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const [{ result: groupName }] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => {
+        const groupNameEl =
+          document.querySelector('h1 a[href*="/groups/"]') ||
+          document.querySelector('a[aria-label][href*="/groups/"]');
+        return groupNameEl?.textContent || "Facebook Group";
+      },
+    });
+
+    // Log debug info
+    console.log("=== DEBUG: Screenshot Capture ===");
+    console.log("Group Name:", groupName);
+    console.log("Screenshots captured:", screenshots.length);
+    console.log("Screenshot sizes:", screenshots.map((s) => Math.round(s.length / 1024) + " KB"));
+    console.log("Total payload size:", Math.round(JSON.stringify({ screenshots, groupName }).length / 1024) + " KB");
+    console.log("=== END DEBUG ===");
+
+    setStatus(`Captured ${screenshots.length} screenshots (check console F12)`, "success");
+  } catch (error) {
+    setStatus("Error: " + error.message, "error");
+    console.error("Debug error:", error);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 document.getElementById("summarize-btn").addEventListener("click", handleSummarize);
+document.getElementById("debug-btn").addEventListener("click", handleDebug);
 init();
