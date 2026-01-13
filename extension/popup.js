@@ -122,8 +122,13 @@ async function handleSummarize() {
       throw new Error(data.error || "Failed to summarize");
     }
 
-    document.getElementById("post-count").textContent = data.postCount || "—";
-    setStatus(`Summary sent to your email! (${data.postCount} posts found)`, "success");
+    document.getElementById("post-count").textContent = data.totalExtracted || data.postCount || "—";
+
+    if (data.postCount === 0) {
+      setStatus(`No new posts since last check (${data.totalExtracted} total seen)`, "success");
+    } else {
+      setStatus(`Summary sent! (${data.postCount} new posts)`, "success");
+    }
   } catch (error) {
     setStatus("Error: " + error.message, "error");
   } finally {

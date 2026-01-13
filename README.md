@@ -31,7 +31,7 @@ npm install
 ### 2. Deploy to Vercel
 
 ```bash
-npx vercel
+npx vercel --prod
 ```
 
 ### 3. Configure environment variables
