@@ -42,42 +42,71 @@ async function captureScreenshots() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const screenshots = [];
 
-  // Get viewport height for scrolling
-  const [{ result: viewportHeight }] = await chrome.scripting.executeScript({
+  // Get post elements and scroll each into view for complete capture
+  const [{ result: postCount }] = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
-    func: () => window.innerHeight,
+    func: () => {
+      // Find all top-level posts (not comments)
+      const feed = document.querySelector('[role="feed"]');
+      if (!feed) return 0;
+
+      const articles = feed.querySelectorAll('[role="article"]');
+      const posts = [];
+      articles.forEach((article) => {
+        // Skip nested articles (comments)
+        if (!article.parentElement?.closest('[role="article"]')) {
+          posts.push(article);
+        }
+      });
+
+      // Store posts globally so we can access them in subsequent calls
+      window.__fbGroupWatcherPosts = posts;
+      return posts.length;
+    },
   });
 
-  // Capture initial screenshot (JPEG at 70% quality to reduce size)
-  setStatus("Capturing screenshots (1/3)...", "loading");
-  let screenshot = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "jpeg", quality: 70 });
-  screenshots.push(screenshot);
+  if (postCount === 0) {
+    // Fallback to simple scrolling if no posts found
+    setStatus("No posts found, using fallback...", "loading");
+    const screenshot = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "jpeg", quality: 70 });
+    return [screenshot];
+  }
 
-  // Scroll and capture more screenshots (reduced to 3 total)
-  for (let i = 1; i < 3; i++) {
-    setStatus(`Capturing screenshots (${i + 1}/3)...`, "loading");
+  // Capture screenshots by scrolling each post into view
+  const numCaptures = Math.min(postCount, 5); // Capture up to 5 posts
+  const postsPerCapture = Math.max(1, Math.floor(postCount / numCaptures));
 
-    // Scroll down
+  for (let i = 0; i < numCaptures; i++) {
+    const postIndex = i * postsPerCapture;
+    setStatus(`Capturing post ${postIndex + 1} of ${postCount}...`, "loading");
+
+    // Scroll the post into view (centered)
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      func: (scrollAmount) => {
-        window.scrollBy(0, scrollAmount);
+      func: (index) => {
+        const posts = window.__fbGroupWatcherPosts;
+        if (posts && posts[index]) {
+          posts[index].scrollIntoView({ behavior: "instant", block: "center" });
+        }
       },
-      args: [viewportHeight * 0.8], // Scroll 80% of viewport to ensure overlap
+      args: [postIndex],
     });
 
-    // Wait for content to load
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    // Wait for scroll and lazy-loaded content to render
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // Capture screenshot
-    screenshot = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "jpeg", quality: 70 });
+    const screenshot = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "jpeg", quality: 70 });
     screenshots.push(screenshot);
   }
 
   // Scroll back to top
   await chrome.scripting.executeScript({
     target: { tabId: tab.id },
-    func: () => window.scrollTo(0, 0),
+    func: () => {
+      delete window.__fbGroupWatcherPosts;
+      window.scrollTo(0, 0);
+    },
   });
 
   return screenshots;
